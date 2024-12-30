@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insurance Prediction</title>
+</head>
+<body>
+    <h1>Medical Insurance Cost Prediction</h1>
+    <form action="/predict" method="POST">
+        <label for="age">Age:</label>
+        <input type="number" id="age" name="age" required><br>
+
+        <label for="sex">Sex (0 for Female, 1 for Male):</label>
+        <input type="number" id="sex" name="sex" required><br>
+
+        <label for="bmi">BMI:</label>
+        <input type="number" step="any" id="bmi" name="bmi" required><br>
+
+        <label for="children">Number of Children:</label>
+        <input type="number" id="children" name="children" required><br>
+
+        <label for="smoker">Smoker (0 for No, 1 for Yes):</label>
+        <input type="number" id="smoker" name="smoker" required><br>
+
+        <label for="region">Region (0, 1, 2, or 3):</label>
+        <input type="number" id="region" name="region" required><br>
+
+        <button type="submit">Predict</button>
+    </form>
+
+    {% if prediction %}
+        <h2>{{ prediction }}</h2>
+    {% endif %}
+</body>
+</html>
