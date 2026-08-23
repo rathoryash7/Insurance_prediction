@@ -1,5 +1,3 @@
-import json
-
 import joblib
 import pandas as pd
 import xgboost as xgb
@@ -53,8 +51,5 @@ r2 = r2_score(y_test, y_pred)
 print(f"Mean Squared Error: {mse}")
 print(f"R-squared: {r2}")
 
-joblib.dump(grid_search.best_estimator_, MODEL_PATH.with_name("xgb_model_optimized.pkl"))
-joblib.dump(scaler, SCALER_PATH.with_name("scaler.pkl"))
-grid_search.best_estimator_.get_booster().save_model(MODEL_PATH.with_name("model.json"))
-with SCALER_PATH.with_name("scaler.json").open("w", encoding="utf-8") as file:
-    json.dump({"mean": scaler.mean_.tolist(), "scale": scaler.scale_.tolist()}, file, indent=2)
+joblib.dump(grid_search.best_estimator_, MODEL_PATH)
+joblib.dump(scaler, SCALER_PATH)

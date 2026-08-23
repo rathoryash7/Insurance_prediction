@@ -1,20 +1,21 @@
-import json
+import joblib
 import pandas as pd
 import pytest
+from sklearn.preprocessing import StandardScaler
 
-from ml.constants import FEATURE_COLUMNS, SCALER_PATH
-from ml.predictor import _predict_model, clear_model_cache, predict_cost
+from ml.constants import FEATURE_COLUMNS, MODEL_PATH, SCALER_PATH
+from ml.predictor import clear_model_cache, predict_cost
 from ml.preprocess import ValidationError, encode_features, prepare_training_features, validate_input
 
 
 @pytest.fixture(scope="session")
-def scaler() -> dict[str, list[float]]:
-    return json.loads(SCALER_PATH.read_text(encoding="utf-8"))
+def scaler() -> StandardScaler:
+    return joblib.load(SCALER_PATH)
 
 
 @pytest.fixture(scope="session")
 def model():
-    return json.loads((SCALER_PATH.parent / "model.json").read_text(encoding="utf-8"))
+    return joblib.load(MODEL_PATH)
 
 
 @pytest.fixture(autouse=True)
@@ -127,7 +128,7 @@ def test_encode_features_matches_training_pipeline(scaler, model):
     data = pd.read_csv("insurance.csv")
     features = data.drop("charges", axis=1)
     training_matrix, _ = prepare_training_features(features, scaler=scaler, fit_scaler=False)
-    training_predictions = [_predict_model(model, row) for row in training_matrix.values.tolist()]
+    training_predictions = model.predict(training_matrix)
 
     for index in range(5):
         row = data.iloc[index]
@@ -142,7 +143,7 @@ def test_encode_features_matches_training_pipeline(scaler, model):
             },
             scaler,
         )
-        manual_prediction = _predict_model(model, encoded[0])
+        manual_prediction = model.predict(encoded)[0]
         assert manual_prediction == pytest.approx(training_predictions[index], rel=0, abs=1e-4)
 
 

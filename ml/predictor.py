@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
 from functools import lru_cache
 from typing import Any
+
+import joblib
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBRegressor
 
 from ml.constants import MODEL_PATH, SCALER_PATH
 from ml.preprocess import ValidationError, encode_features
@@ -26,39 +30,17 @@ class ModelLoadError(RuntimeError):
 
 
 @lru_cache(maxsize=1)
-def _load_scaler() -> dict[str, list[float]]:
+def _load_scaler() -> StandardScaler:
     if not SCALER_PATH.exists():
         raise ModelLoadError(f"Scaler file not found: {SCALER_PATH}")
-    with SCALER_PATH.open(encoding="utf-8") as file:
-        return json.load(file)
+    return joblib.load(SCALER_PATH)
 
 
 @lru_cache(maxsize=1)
-def _load_model() -> dict[str, Any]:
+def _load_model() -> XGBRegressor:
     if not MODEL_PATH.exists():
         raise ModelLoadError(f"Model file not found: {MODEL_PATH}")
-    with MODEL_PATH.open(encoding="utf-8") as file:
-        return json.load(file)
-
-
-def _predict_tree(tree: dict[str, Any], features: list[float]) -> float:
-    node = 0
-    while tree["left_children"][node] != -1:
-        feature_index = tree["split_indices"][node]
-        if features[feature_index] < tree["split_conditions"][node]:
-            node = tree["left_children"][node]
-        else:
-            node = tree["right_children"][node]
-    return tree["base_weights"][node]
-
-
-def _predict_model(model: dict[str, Any], features: list[float]) -> float:
-    learner = model["learner"]
-    booster = learner["gradient_booster"]["model"]
-    prediction = float(learner["learner_model_param"]["base_score"])
-    for tree in booster["trees"]:
-        prediction += _predict_tree(tree, features)
-    return prediction
+    return joblib.load(MODEL_PATH)
 
 
 def predict_cost(payload: dict[str, Any]) -> PredictionResult:
@@ -66,9 +48,9 @@ def predict_cost(payload: dict[str, Any]) -> PredictionResult:
     scaler = _load_scaler()
     model = _load_model()
     features = encode_features(payload, scaler)
-    prediction = _predict_model(model, features[0])
+    prediction = float(model.predict(features)[0])
 
-    if not prediction == prediction or prediction in (float("inf"), float("-inf")) or prediction < 0:
+    if not np.isfinite(prediction) or prediction < 0:
         raise ModelLoadError("Model returned an invalid prediction.")
 
     return PredictionResult(predicted_cost=prediction)
