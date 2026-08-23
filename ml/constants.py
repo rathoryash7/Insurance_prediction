@@ -4,8 +4,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-MODEL_PATH = PROJECT_ROOT / "xgb_model_optimized.pkl"
-SCALER_PATH = PROJECT_ROOT / "scaler.pkl"
+MODEL_PATH = PROJECT_ROOT / "model.json"
+SCALER_PATH = PROJECT_ROOT / "scaler.json"
 
 FEATURE_COLUMNS = [
     "age",

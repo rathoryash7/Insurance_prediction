@@ -4,10 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
-
 from ml.constants import FEATURE_COLUMNS, INPUT_BOUNDS, SCALE_COLUMNS, VALID_REGIONS, VALID_SEX, VALID_SMOKER
 
 
@@ -63,7 +59,7 @@ def validate_input(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def encode_features(raw_input: dict[str, Any], scaler: StandardScaler) -> np.ndarray:
+def encode_features(raw_input: dict[str, Any], scaler: dict[str, list[float]]) -> list[list[float]]:
     """
     Encode a single record into the feature vector expected by the model.
 
@@ -82,15 +78,18 @@ def encode_features(raw_input: dict[str, Any], scaler: StandardScaler) -> np.nda
         "region_southwest": 1 if validated["region"] == "southwest" else 0,
     }
 
-    frame = pd.DataFrame([features])[FEATURE_COLUMNS]
-    frame[SCALE_COLUMNS] = scaler.transform(frame[SCALE_COLUMNS])
-    return frame.values
+    values = [features[column] for column in FEATURE_COLUMNS]
+    for index, column in enumerate(SCALE_COLUMNS):
+        scale_index = SCALE_COLUMNS.index(column)
+        values[index] = (values[index] - scaler["mean"][scale_index]) / scaler["scale"][scale_index]
+    return [values]
 
 
-def prepare_training_features(
-    features: pd.DataFrame, scaler: StandardScaler | None = None, fit_scaler: bool = False
-) -> tuple[pd.DataFrame, StandardScaler]:
+def prepare_training_features(features: Any, scaler: Any = None, fit_scaler: bool = False) -> Any:
     """Prepare training/inference-aligned feature matrix from raw CSV columns."""
+    import pandas as pd
+    from sklearn.preprocessing import StandardScaler
+
     encoded = pd.get_dummies(features, columns=["sex", "smoker", "region"], drop_first=True)
 
     for column in FEATURE_COLUMNS:
@@ -107,5 +106,11 @@ def prepare_training_features(
     if scaler is None:
         raise ValueError("Scaler is required when fit_scaler=False.")
 
-    encoded[SCALE_COLUMNS] = scaler.transform(encoded[SCALE_COLUMNS])
+    if isinstance(scaler, dict):
+        for index, column in enumerate(SCALE_COLUMNS):
+            encoded[column] = (
+                encoded[column] - scaler["mean"][index]
+            ) / scaler["scale"][index]
+    else:
+        encoded[SCALE_COLUMNS] = scaler.transform(encoded[SCALE_COLUMNS])
     return encoded, scaler

@@ -24,9 +24,8 @@ User form / JSON API
 
 - Python 3.11+
 - Flask
-- scikit-learn (StandardScaler)
-- XGBoost
-- pandas / numpy
+- Portable JSON model inference
+- pandas / scikit-learn / XGBoost (training only)
 - pytest
 
 ## ML Pipeline
@@ -36,7 +35,7 @@ User form / JSON API
    - `sex_male`
    - `smoker_yes`
    - region one-hot with `northeast` as the reference category
-3. Continuous features `age`, `bmi`, and `children` are scaled with the saved `StandardScaler`
+3. Continuous features `age`, `bmi`, and `children` are scaled with the saved scaler values
 4. The XGBoost model predicts annual insurance charges in USD
 
 Shared preprocessing lives in `ml/preprocess.py` so training and inference stay aligned.
@@ -46,7 +45,7 @@ Shared preprocessing lives in `ml/preprocess.py` so training and inference stay 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 python app.py
 ```
 
@@ -58,7 +57,7 @@ Optional training:
 python train_model.py
 ```
 
-This regenerates `xgb_model_optimized.pkl` and `scaler.pkl`.
+This regenerates both the development pickle artifacts and the lightweight runtime artifacts (`model.json` and `scaler.json`).
 
 ## Environment Variables
 
@@ -163,8 +162,7 @@ Deploy with the Vercel CLI or by connecting the GitHub repository.
 
 ## Troubleshooting
 
-- **`InconsistentVersionWarning` for scikit-learn**: reinstall dependencies from `requirements.txt` using sklearn `1.3.0`.
-- **Model file not found**: ensure `xgb_model_optimized.pkl` and `scaler.pkl` exist in the project root.
+- **Model file not found**: ensure `model.json` and `scaler.json` exist in the project root.
 - **Unexpected predictions**: confirm inputs use semantic values (`male`, `yes`, `northwest`) rather than numeric codes.
 - **Vercel cold starts**: first request may be slower while Python dependencies and model artifacts load.
 
