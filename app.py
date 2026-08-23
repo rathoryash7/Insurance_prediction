@@ -1,100 +1,53 @@
-import os
+from flask import Flask, render_template, request
+import numpy as np
+import pandas as pd
+import joblib  # Used for loading the trained model
 
-from flask import Flask, jsonify, render_template, request
+# Load pre-trained model and scaler
+scaler = joblib.load('scaler.pkl')  # Ensure this matches the saved scaler file name
+xgb_reg = joblib.load('xgb_model_optimized.pkl')  # Ensure this matches the saved model's name
 
-from ml.predictor import ModelLoadError, predict_cost
-from ml.preprocess import ValidationError
+# Load the column names used in one-hot encoding
+columns = ['age', 'bmi', 'children', 'sex_male', 'smoker_yes', 'region_northwest', 'region_southeast', 'region_southwest']
 
 app = Flask(__name__)
-app.config["JSON_SORT_KEYS"] = False
 
-
-def _error_response(code: str, message: str, status: int):
-    return jsonify({"success": False, "error": {"code": code, "message": message}}), status
-
-
-def _success_response(data: dict, status: int = 200):
-    return jsonify({"success": True, "data": data}), status
-
-
-def _extract_payload() -> dict:
-    if request.is_json:
-        payload = request.get_json(silent=True) or {}
-        if isinstance(payload, dict):
-            return payload
-
-    return {
-        "age": request.form.get("age"),
-        "sex": request.form.get("sex"),
-        "bmi": request.form.get("bmi"),
-        "children": request.form.get("children"),
-        "smoker": request.form.get("smoker"),
-        "region": request.form.get("region"),
-    }
-
-
-@app.route("/")
+@app.route('/')
 def index():
-    return render_template("insurance-prediction.html")
+    return render_template('insurance-prediction.html')  # Render the prediction form
 
-
-@app.route("/health")
-def health():
-    return _success_response({"status": "ok"})
-
-
-@app.route("/api/predict", methods=["POST"])
-def api_predict():
-    try:
-        result = predict_cost(_extract_payload())
-        return _success_response(
-            {
-                "predicted_cost": round(result.predicted_cost, 2),
-                "currency": result.currency,
-                "formatted_cost": result.formatted_cost,
-            }
-        )
-    except ValidationError as exc:
-        return _error_response("VALIDATION_ERROR", str(exc), 400)
-    except ModelLoadError as exc:
-        return _error_response("MODEL_ERROR", str(exc), 500)
-    except Exception:
-        return _error_response(
-            "INTERNAL_ERROR",
-            "An unexpected error occurred while generating the prediction.",
-            500,
-        )
-
-
-@app.route("/predict", methods=["GET", "POST"])
+@app.route('/predict', methods=['POST'])
 def predict():
-    if request.method == "GET":
-        return render_template("insurance-prediction.html")
-
     try:
-        result = predict_cost(_extract_payload())
-        return render_template(
-            "insurance-prediction.html",
-            result={
-                "predicted_cost": round(result.predicted_cost, 2),
-                "currency": result.currency,
-                "formatted_cost": result.formatted_cost,
-            },
-        )
-    except ValidationError as exc:
-        return render_template("insurance-prediction.html", error=str(exc)), 400
-    except ModelLoadError as exc:
-        return render_template("insurance-prediction.html", error=str(exc)), 500
-    except Exception:
-        return (
-            render_template(
-                "insurance-prediction.html",
-                error="Something went wrong. Please try again.",
-            ),
-            500,
-        )
+        # Get input values from HTML form
+        age = float(request.form['age'])
+        sex = int(request.form['sex'])
+        bmi = float(request.form['bmi'])
+        children = int(request.form['children'])
+        smoker = int(request.form['smoker'])
+        region = int(request.form['region'])
 
+        # Prepare the input data
+        input_data = {'age': age, 'sex_male': sex, 'bmi': bmi, 'children': children, 'smoker_yes': smoker}
 
-if __name__ == "__main__":
-    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=debug)
+        # Handle one-hot encoding for region
+        region_mapping = {0: 'region_northwest', 1: 'region_southeast', 2: 'region_southwest'}
+        input_data[region_mapping.get(region, '')] = 1  # Set the correct region to 1
+        input_data = {k: v if k in input_data else 0 for k, v in zip(columns, [0] * len(columns))}  # Ensure all columns exist in the input data
+
+        input_data_as_numpy_array = np.asarray(list(input_data.values()))
+        input_data_reshaped = input_data_as_numpy_array.reshape(1, -1)
+
+        # Standardize the input data using the same scaler used for training
+        input_data_standardized = scaler.transform(input_data_reshaped)
+
+        # Make the prediction
+        prediction = xgb_reg.predict(input_data_standardized)
+
+        # Return the result to the HTML page
+        return render_template('insurance-prediction.html', prediction=f'The predicted insurance cost is USD {prediction[0]:.2f}')
+    except Exception as e:
+        return str(e)
+
+if __name__ == '__main__':
+    app.run(debug=True)
